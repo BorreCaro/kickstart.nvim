@@ -23,6 +23,7 @@ return {
 
     -- Add your own debuggers here
     'leoluz/nvim-dap-go',
+    'mfussenegger/nvim-dap-python',
   },
   keys = {
     -- Basic debugging keymaps, feel free to change to your liking!
@@ -95,6 +96,8 @@ return {
       ensure_installed = {
         -- Update this to ensure that you have the debuggers for the langs you want
         'delve',
+        'debugpy', -- Python debugger
+        'java-debug-adapter', -- Java debugger
       },
     }
 
@@ -107,11 +110,11 @@ return {
       icons = { expanded = '▾', collapsed = '▸', current_frame = '*' },
       controls = {
         icons = {
-          pause = '⏸',
+          pause = '⸸',
           play = '▶',
-          step_into = '⏎',
-          step_over = '⏭',
-          step_out = '⏮',
+          step_into = '⎆',
+          step_over = '⭮',
+          step_out = '⭯',
           step_back = 'b',
           run_last = '▶▶',
           terminate = '⏹',
@@ -121,16 +124,21 @@ return {
     }
 
     -- Change breakpoint icons
-    -- vim.api.nvim_set_hl(0, 'DapBreak', { fg = '#e51400' })
-    -- vim.api.nvim_set_hl(0, 'DapStop', { fg = '#ffcc00' })
-    -- local breakpoint_icons = vim.g.have_nerd_font
-    --     and { Breakpoint = '', BreakpointCondition = '', BreakpointRejected = '', LogPoint = '', Stopped = '' }
-    --   or { Breakpoint = '●', BreakpointCondition = '⊜', BreakpointRejected = '⊘', LogPoint = '◆', Stopped = '⭔' }
-    -- for type, icon in pairs(breakpoint_icons) do
-    --   local tp = 'Dap' .. type
-    --   local hl = (type == 'Stopped') and 'DapStop' or 'DapBreak'
-    --   vim.fn.sign_define(tp, { text = icon, texthl = hl, numhl = hl })
-    -- end
+    vim.api.nvim_set_hl(0, 'DapBreak', { fg = '#e51400' })
+    vim.api.nvim_set_hl(0, 'DapStop', { fg = '#ffcc00' })
+    -- Iconos con emojis que funcionan en cualquier terminal
+    local breakpoint_icons = {
+      Breakpoint = '🔴',
+      BreakpointCondition = '⊜',
+      BreakpointRejected = '⊘',
+      LogPoint = '◆',
+      Stopped = '⭔',
+    }
+    for type, icon in pairs(breakpoint_icons) do
+      local tp = 'Dap' .. type
+      local hl = (type == 'Stopped') and 'DapStop' or 'DapBreak'
+      vim.fn.sign_define(tp, { text = icon, texthl = hl, numhl = hl })
+    end
 
     dap.listeners.after.event_initialized['dapui_config'] = dapui.open
     dap.listeners.before.event_terminated['dapui_config'] = dapui.close
@@ -142,6 +150,40 @@ return {
         -- On Windows delve must be run attached or it crashes.
         -- See https://github.com/leoluz/nvim-dap-go/blob/main/README.md#configuring
         detached = vim.fn.has 'win32' == 0,
+      },
+    }
+
+    -- Python configuration
+    local python_path = 'C:\\Users\\danis.DESKTOP-HQR1BPJ\\AppData\\Local\\Programs\\Python\\Python314\\python.exe'
+    require('dap-python').setup(python_path)
+
+    -- Configuración explícita del adaptador (a veces mason-nvim-dap no lo configura bien)
+    dap.adapters.python = {
+      type = 'executable',
+      command = python_path,
+      args = { '-m', 'debugpy.adapter' },
+    }
+
+    -- Sobrescribe la configuración por defecto con una más robusta
+    dap.configurations.python = {
+      {
+        type = 'python',
+        request = 'launch',
+        name = 'Launch file',
+        program = '${file}',
+        console = 'integratedTerminal',
+        pythonArgs = { '-Xfrozen_modules=off' },
+      },
+    }
+
+    -- Java configuration
+    dap.configurations.java = {
+      {
+        type = 'java',
+        request = 'attach',
+        name = 'Debug (Attach) - Remote',
+        hostName = '127.0.0.1',
+        port = 5005,
       },
     }
   end,
