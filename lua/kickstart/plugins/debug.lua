@@ -1,32 +1,19 @@
 -- debug.lua
---
--- Shows how to use the DAP plugin to debug your code.
---
--- Primarily focused on configuring the debugger for Go, but can
--- be extended to other languages as well. That's why it's called
--- kickstart.nvim and not kitchen-sink.nvim ;)
+-- Configuración de DAP compatible con Windows y WSL (Linux)
 
 return {
-  -- NOTE: Yes, you can install new plugins here!
   'mfussenegger/nvim-dap',
-  -- NOTE: And you can specify dependencies as well
   dependencies = {
-    -- Creates a beautiful debugger UI
     'rcarriga/nvim-dap-ui',
-
-    -- Required dependency for nvim-dap-ui
     'nvim-neotest/nvim-nio',
-
-    -- Installs the debug adapters for you
     'mason-org/mason.nvim',
     'jay-babu/mason-nvim-dap.nvim',
 
-    -- Add your own debuggers here
+    -- Debuggers específicos
     'leoluz/nvim-dap-go',
     'mfussenegger/nvim-dap-python',
   },
   keys = {
-    -- Basic debugging keymaps, feel free to change to your liking!
     {
       '<F5>',
       function()
@@ -69,7 +56,6 @@ return {
       end,
       desc = 'Debug: Set Breakpoint',
     },
-    -- Toggle to see last session result. Without this, you can't see session output in case of unhandled exception.
     {
       '<F7>',
       function()
@@ -82,31 +68,21 @@ return {
     local dap = require 'dap'
     local dapui = require 'dapui'
 
+    -- Detectar sistema operativo
+    local is_windows = vim.fn.has 'win32' == 1
+
     require('mason-nvim-dap').setup {
-      -- Makes a best effort to setup the various debuggers with
-      -- reasonable debug configurations
       automatic_installation = true,
-
-      -- You can provide additional configuration to the handlers,
-      -- see mason-nvim-dap README for more information
       handlers = {},
-
-      -- You'll need to check that you have the required things installed
-      -- online, please don't ask me how to install them :)
       ensure_installed = {
-        -- Update this to ensure that you have the debuggers for the langs you want
-        'delve',
-        'debugpy', -- Python debugger
-        'java-debug-adapter', -- Java debugger
+        'delve', -- Go
+        'debugpy', -- Python
+        'codelldb', -- C++ / C / Rust (IMPORTANTE PARA TI)
       },
     }
 
-    -- Dap UI setup
-    -- For more information, see |:help nvim-dap-ui|
+    -- Configuración de UI
     dapui.setup {
-      -- Set icons to characters that are more likely to work in every terminal.
-      --    Feel free to remove or use ones that you like more! :)
-      --    Don't feel like these are good choices.
       icons = { expanded = '▾', collapsed = '▸', current_frame = '*' },
       controls = {
         icons = {
@@ -123,48 +99,51 @@ return {
       },
     }
 
-    -- Change breakpoint icons
+    -- Iconos de Breakpoints
     vim.api.nvim_set_hl(0, 'DapBreak', { fg = '#e51400' })
     vim.api.nvim_set_hl(0, 'DapStop', { fg = '#ffcc00' })
-    -- Iconos con emojis que funcionan en cualquier terminal
-    local breakpoint_icons = {
-      Breakpoint = '🔴',
-      BreakpointCondition = '⊜',
-      BreakpointRejected = '⊘',
-      LogPoint = '◆',
-      Stopped = '⭔',
-    }
+    local breakpoint_icons = { Breakpoint = '🔴', BreakpointCondition = '⊜', BreakpointRejected = '⊘', LogPoint = '◆', Stopped = '⭔' }
     for type, icon in pairs(breakpoint_icons) do
       local tp = 'Dap' .. type
       local hl = (type == 'Stopped') and 'DapStop' or 'DapBreak'
       vim.fn.sign_define(tp, { text = icon, texthl = hl, numhl = hl })
     end
 
+    -- Listeners para abrir/cerrar UI automáticamente
     dap.listeners.after.event_initialized['dapui_config'] = dapui.open
     dap.listeners.before.event_terminated['dapui_config'] = dapui.close
     dap.listeners.before.event_exited['dapui_config'] = dapui.close
 
-    -- Install golang specific config
+    -----------------------------------------------------------------------
+    -- CONFIGURACIÓN GO
+    -----------------------------------------------------------------------
     require('dap-go').setup {
       delve = {
-        -- On Windows delve must be run attached or it crashes.
-        -- See https://github.com/leoluz/nvim-dap-go/blob/main/README.md#configuring
-        detached = vim.fn.has 'win32' == 0,
+        detached = not is_windows, -- En Windows debe ser false (attached), en Linux true
       },
     }
 
-    -- Python configuration
-    local python_path = 'C:\\Users\\danis.DESKTOP-HQR1BPJ\\AppData\\Local\\Programs\\Python\\Python314\\python.exe'
+    -----------------------------------------------------------------------
+    -- CONFIGURACIÓN PYTHON
+    -----------------------------------------------------------------------
+    -- Lógica para elegir el intérprete según el OS
+    local python_path
+    if is_windows then
+      python_path = 'C:\\Users\\danis.DESKTOP-HQR1BPJ\\AppData\\Local\\Programs\\Python\\Python314\\python.exe'
+    else
+      -- EN LINUX/WSL: Usamos el Python interno que instala Mason.
+      -- Este es el único que garantizamos que tiene 'debugpy' instalado.
+      python_path = vim.fn.stdpath 'data' .. '/mason/packages/debugpy/venv/bin/python'
+
+      -- Si por casualidad Mason no lo ha instalado, usamos el del sistema como último recurso
+      if vim.fn.filereadable(python_path) == 0 then
+        python_path = '/usr/bin/python3'
+      end
+    end
+
     require('dap-python').setup(python_path)
 
-    -- Configuración explícita del adaptador (a veces mason-nvim-dap no lo configura bien)
-    dap.adapters.python = {
-      type = 'executable',
-      command = python_path,
-      args = { '-m', 'debugpy.adapter' },
-    }
-
-    -- Sobrescribe la configuración por defecto con una más robusta
+    -- Configuraciones extra de Python para asegurar que funcione
     dap.configurations.python = {
       {
         type = 'python',
@@ -172,19 +151,38 @@ return {
         name = 'Launch file',
         program = '${file}',
         console = 'integratedTerminal',
-        pythonArgs = { '-Xfrozen_modules=off' },
+        pythonArgs = { '-Xfrozen_modules=off' }, -- Necesario para debugpy moderno
+        pythonPath = function()
+          local venv = os.getenv 'VIRTUAL_ENV'
+          if venv then
+            return venv .. '/bin/python'
+          else
+            return '/usr/bin/python3'
+          end
+        end,
       },
     }
 
-    -- Java configuration
-    dap.configurations.java = {
+    -----------------------------------------------------------------------
+    -- CONFIGURACIÓN C++ / C / RUST (Añadida para ti)
+    -----------------------------------------------------------------------
+    -- Mason instala codelldb automáticamente, pero a veces hay que configurar el adaptador manualmente
+    -- Si usas Mason, esto suele configurarse solo via mason-nvim-dap,
+    -- pero aquí definimos la configuración de lanzamiento.
+    dap.configurations.cpp = {
       {
-        type = 'java',
-        request = 'attach',
-        name = 'Debug (Attach) - Remote',
-        hostName = '127.0.0.1',
-        port = 5005,
+        name = 'Launch file',
+        type = 'codelldb',
+        request = 'launch',
+        program = function()
+          return vim.fn.input('Path to executable: ', vim.fn.getcwd() .. '/', 'file')
+        end,
+        cwd = '${workspaceFolder}',
+        stopOnEntry = false,
       },
     }
+    -- Usar la misma config para C y Rust
+    dap.configurations.c = dap.configurations.cpp
+    dap.configurations.rust = dap.configurations.cpp
   end,
 }
