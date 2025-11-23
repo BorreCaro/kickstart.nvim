@@ -77,7 +77,7 @@ return {
       ensure_installed = {
         'delve', -- Go
         'debugpy', -- Python
-        'codelldb', -- C++ / C / Rust (IMPORTANTE PARA TI)
+        'codelldb', -- C++ / C / Rust
       },
     }
 
@@ -119,23 +119,19 @@ return {
     -----------------------------------------------------------------------
     require('dap-go').setup {
       delve = {
-        detached = not is_windows, -- En Windows debe ser false (attached), en Linux true
+        detached = not is_windows,
       },
     }
 
     -----------------------------------------------------------------------
     -- CONFIGURACIÓN PYTHON
     -----------------------------------------------------------------------
-    -- Lógica para elegir el intérprete según el OS
     local python_path
     if is_windows then
       python_path = 'C:\\Users\\danis.DESKTOP-HQR1BPJ\\AppData\\Local\\Programs\\Python\\Python314\\python.exe'
     else
-      -- EN LINUX/WSL: Usamos el Python interno que instala Mason.
-      -- Este es el único que garantizamos que tiene 'debugpy' instalado.
+      -- Linux/WSL: Python interno de Mason
       python_path = vim.fn.stdpath 'data' .. '/mason/packages/debugpy/venv/bin/python'
-
-      -- Si por casualidad Mason no lo ha instalado, usamos el del sistema como último recurso
       if vim.fn.filereadable(python_path) == 0 then
         python_path = '/usr/bin/python3'
       end
@@ -143,7 +139,6 @@ return {
 
     require('dap-python').setup(python_path)
 
-    -- Configuraciones extra de Python para asegurar que funcione
     dap.configurations.python = {
       {
         type = 'python',
@@ -151,7 +146,7 @@ return {
         name = 'Launch file',
         program = '${file}',
         console = 'integratedTerminal',
-        pythonArgs = { '-Xfrozen_modules=off' }, -- Necesario para debugpy moderno
+        pythonArgs = { '-Xfrozen_modules=off' },
         pythonPath = function()
           local venv = os.getenv 'VIRTUAL_ENV'
           if venv then
@@ -164,24 +159,32 @@ return {
     }
 
     -----------------------------------------------------------------------
-    -- CONFIGURACIÓN C++ / C / RUST (Añadida para ti)
+    -- CONFIGURACIÓN C++ / C / RUST (Actualizada)
     -----------------------------------------------------------------------
-    -- Mason instala codelldb automáticamente, pero a veces hay que configurar el adaptador manualmente
-    -- Si usas Mason, esto suele configurarse solo via mason-nvim-dap,
-    -- pero aquí definimos la configuración de lanzamiento.
     dap.configurations.cpp = {
       {
         name = 'Launch file',
         type = 'codelldb',
         request = 'launch',
+        -- Aquí está la magia: Calcula automáticamente ruta/bin/archivo
         program = function()
-          return vim.fn.input('Path to executable: ', vim.fn.getcwd() .. '/', 'file')
+          local is_win = vim.fn.has 'win32' == 1
+          local sep = is_win and '\\' or '/'
+          local ext = is_win and '.exe' or ''
+          local cwd = vim.fn.getcwd()
+          local file_name = vim.fn.expand '%:t:r' -- Nombre archivo sin extensión
+
+          -- Construye: C:\Proyecto\bin\main.exe o /home/user/proyecto/bin/main
+          local default_path = cwd .. sep .. 'bin' .. sep .. file_name .. ext
+
+          return vim.fn.input('Path to executable: ', default_path, 'file')
         end,
         cwd = '${workspaceFolder}',
         stopOnEntry = false,
       },
     }
-    -- Usar la misma config para C y Rust
+
+    -- Reutilizamos la config para C y Rust
     dap.configurations.c = dap.configurations.cpp
     dap.configurations.rust = dap.configurations.cpp
   end,
