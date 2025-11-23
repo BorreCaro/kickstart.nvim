@@ -153,7 +153,8 @@ vim.o.smartcase = true
 vim.o.signcolumn = 'yes'
 
 -- Decrease update time
-vim.o.updatetime = 250
+vim.o.updatetime = 50
+vim.opt.lazyredraw = false
 
 -- Decrease mapped sequence wait time
 vim.o.timeoutlen = 300
@@ -701,7 +702,6 @@ require('lazy').setup({
             'clangd',
             '--background-index',
             '--clang-tidy',
-            '--query-driver=C:/msys64/ucrt64/bin/g++.exe',
             '--style={BasedOnStyle: Google, IndentWith: 4, TabWidth: 4, ColumnLimit: 0}',
           },
         },
