@@ -21,6 +21,8 @@ return {
       disable_defaults = false,
       debug = false,
       theme = 'OneHalfDark',
+      wslclipboard = 'auto',
+      wslclipboardcopy = 'delete',
     }
 
     -- Visual: guardar como archivo

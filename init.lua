@@ -119,7 +119,31 @@ end
 -- See `:help vim.o`
 -- NOTE: You can change these options as you wish!
 --  For more options, you can see `:help option-list`
+if vim.fn.has 'wsl' == 1 then
+  vim.g.clipboard = {
+    name = 'win32yank',
+    copy = {
+      ['+'] = { 'win32yank.exe', '-i', '--crlf' },
+      ['*'] = { 'win32yank.exe', '-i', '--crlf' },
+    },
+    paste = {
+      ['+'] = { 'win32yank.exe', '-o', '--lf' },
+      ['*'] = { 'win32yank.exe', '-o', '--lf' },
+    },
+    cache_enabled = 0,
+  }
+end
+if vim.env.SSH_CONNECTION or vim.env.SSH_CLIENT or vim.env.SSH_TTY then
+  vim.g.clipboard = {
+    name = 'none',
+    copy = { ['+'] = 'true', ['*'] = 'true' },
+    paste = { ['+'] = 'true', ['*'] = 'true' },
+    cache_enabled = 0,
+  }
 
+  -- Deshabilitar los proveedores completamente
+  vim.g.loaded_clipboard_provider = 1
+end
 -- Make line numbers default
 vim.o.number = true
 -- You can also add relative line numbers, to help with jumping.
@@ -153,8 +177,14 @@ vim.o.smartcase = true
 vim.o.signcolumn = 'yes'
 
 -- Decrease update time
-vim.o.updatetime = 50
+vim.o.updatetime = 1000
 vim.opt.lazyredraw = false
+vim.opt.ttyfast = true
+if vim.env.SSH_CONNECTION then
+  vim.opt.clipboard = ''
+else
+  vim.opt.clipboard = 'unnamedplus'
+end
 
 -- Decrease mapped sequence wait time
 vim.o.timeoutlen = 300
