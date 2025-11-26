@@ -179,6 +179,8 @@ if vim.env.SSH_CONNECTION then
 else
   vim.opt.clipboard = 'unnamedplus'
 end
+-- 24-bit colors
+vim.opt.termguicolors = true
 
 -- Decrease mapped sequence wait time
 vim.o.timeoutlen = 300
